@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment      
+metadata:
+  name: pc-deployment
+  namespace: dev
+spec: 
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-pod
+  template:
+    metadata:
+      labels:
+        app: nginx-pod
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.20.0
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d/
+        - name: data-files
+          mountPath: /web/
+      volumes:
+      - name: config
+        configMap:
+           name: my-config
+      - name: data-files
+        hostPath:
+          path: /data/web/
+          type: DirectoryOrCreate
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php-deploy
+  namespace: dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: php-pod
+  template:
+    metadata:
+      labels:
+        app: php-pod
+    spec:
+      containers:
+      - name: php
+        image: php:7.3.28-fpm-alpine3.12
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: data-files
+          mountPath: /web/
+      volumes:
+      - name: data-files
+        hostPath:
+          path: /data/web/
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-nodeport
+  namespace: dev
+spec:
+  selector:
+    app: nginx-pod
+  type: NodePort
+  ports:
+  - port: 80
+    nodePort: 30002
+    targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phpfpm-service
+  namespace: dev
+spec:
+  selector:
+    app: php-pod
+  type: ClusterIP
+  ports:
+  - port: 9000
+    targetPort: 9000
